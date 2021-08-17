@@ -1,0 +1,43 @@
+Message comes in with roomId and an authorId (and message body) from ip123.
+Look up room participants hash table and verify that both the sender and receiver are participants.
+
+room:roomAbc:participants {
+    'author123': 'ip123',
+    'author456': 'ip456',
+    'author789': 'ip789',
+}
+
+room:roomAbc:online {
+    'author123': true,
+    'author456': false,
+    'author789': false,
+}
+
+If true, add message to the room and expire it, then expire the room, and the participant room key.
+
+room:roomAbc:message:timestamp123 { from: 'author123', content: 'Hi!' }
+
+room:roomAbc:messages [
+    { from: 'author123', content: 'Hi!' },
+    { from: 'author456', content: 'Hi!' },
+    { from: 'author123', content: 'Hi!' }
+]
+
+-----------------------------------
+To retrieve rooms, scan:
+ip:ip123:room:*
+ip:ip123:room:roomAbc 3 (number of new messages)
+
+To retrieve messages:
+Req comes in with roomId and ipHash.
+
+Check if key ip:ip123:room:roomAbc exists. If true, set key to 0. (saw messages)
+Get messages:
+
+room:roomAbc:messages [
+    { from: 'author123', content: 'Hi!' },
+    { from: 'author456', content: 'Hi!' },
+    { from: 'author123', content: 'Hi!' }
+]
+
+In client, if we are sitting in chat room and a new message comes in, emit 'saw message' to set message count for this room/ip to 0.
