@@ -1,36 +1,12 @@
-import { mapValues, shuffle } from 'lodash';
-
-export class Frog {
-  sex: 'M' | 'F';
-  constructor(sex: 'M' | 'F') {
-    this.sex = sex;
-  }
+export function calc(numBoards: number) {
+  const maxThreads = 100;
+  const maxPosts = 500;
+  const maxFiles = 4;
+  const maxFileSize = 5000; // Bytes.
+  const maxTotalBytes =
+    numBoards * maxThreads * maxPosts * maxFiles * maxFileSize;
+  console.log('maxTotalBytes:', maxTotalBytes);
+  console.log('Maximum total TB:', maxTotalBytes / 1000 / 1000 / 1000);
 }
 
-const score: Record<string, number> = {
-  MM: 0,
-  MF: 0,
-  FM: 0,
-  FF: 0,
-};
-
-let i = 0;
-while (i < 100000) {
-  // Create frogs. One frog is already known to be male.
-  const frog_1 = new Frog('M');
-  const frog_2 = new Frog(Math.random() > 0.5 ? 'M' : 'F');
-  const frogs = shuffle([frog_1, frog_2]);
-  // Add this set to the score count.
-  score[frogs[0].sex + frogs[1].sex]++;
-  i++;
-}
-
-// Calculate percentages.
-const total = score.MM + score.MF + score.FM + score.FF;
-const percentages = mapValues(
-  score,
-  (val: number) => `${((val / total) * 100).toFixed(2)}%`
-);
-
-// Print results.
-console.log(JSON.stringify(percentages, null, 2));
+calc(10);

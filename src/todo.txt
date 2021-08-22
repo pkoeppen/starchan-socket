@@ -7,21 +7,9 @@ room:roomAbc:participants {
     'author789': 'ip789',
 }
 
-room:roomAbc:online {
-    'author123': true,
-    'author456': false,
-    'author789': false,
-}
-
 If true, add message to the room and expire it, then expire the room, and the participant room key.
 
 room:roomAbc:message:timestamp123 { from: 'author123', content: 'Hi!' }
-
-room:roomAbc:messages [
-    { from: 'author123', content: 'Hi!' },
-    { from: 'author456', content: 'Hi!' },
-    { from: 'author123', content: 'Hi!' }
-]
 
 -----------------------------------
 To retrieve rooms, scan:

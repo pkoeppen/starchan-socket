@@ -3,7 +3,7 @@ import crypto from 'crypto';
 const SIMPLE_ENCRYPTION_KEY = crypto
   .createHash('sha256')
   // .update(config.SIMPLE_ENCRYPTION_KEY)
-  .update('simplekey') // todo
+  .update('starchan') // todo
   .digest('hex')
   .slice(0, 16);
 
