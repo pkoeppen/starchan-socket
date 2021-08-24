@@ -1,16 +1,17 @@
 FROM node:16-alpine
 LABEL org.opencontainers.image.source="https://github.com/pkoeppen/starchan-socket"
 
-ARG NODE_ENV
-ENV NODE_ENV ${NODE_ENV}
-
 WORKDIR /app
 
-COPY package.json ./
+COPY package.json /app/
 RUN npm install --silent
 
-COPY . ./
+COPY tsconfig.json /app/
+COPY src/ /app/src/
+RUN npm run build;
 
+ARG NODE_ENV
+ENV NODE_ENV ${NODE_ENV}
 EXPOSE 3002
 
-CMD [ "npm", "run", "dev" ]
+CMD [ "npm", "start" ]

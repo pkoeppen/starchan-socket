@@ -1,12 +1,16 @@
 {
   "compilerOptions": {
+    "target": "esnext",
+    "module": "commonjs",
     "isolatedModules": true,
-    "sourceMap": true,
-    "rootDirs": ["src", "prisma"],
+    "sourceMap": false,
+    "rootDirs": ["src"],
     "typeRoots": ["src/@types", "node_modules/@types"],
     "outDir": "dist",
     "strict": true,
     "lib": ["esnext"],
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "moduleResolution": "node"
   }
 }

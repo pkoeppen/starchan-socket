@@ -1,19 +1,6 @@
-import * as helpers from './helpers';
-import { sortBy, zip } from 'lodash';
 import { Redis } from 'ioredis';
-import crypto from 'crypto';
 import { logger } from './globals';
-
-/*
-
-Key Summary
-room:<roomId>                     HASH { roomId, boardId, threadId }
-room:<roomId>:message:<timestamp> HASH { from, content, createdAt }
-room:<roomId>:ip:<ipHash>         HASH { authorId }
-room:<roomId>:ip:<ipHash>:unread  INT n
-ip:<ipHash>:online                INT 1 | 0
-
-*/
+import { sortBy } from 'lodash';
 
 const SESSION_TTL = 60 * 60 * 24; // 24 hours.
 const MESSAGE_TTL = 60 * 10; // 10 minutes.
@@ -38,77 +25,74 @@ export default class RedisSessionStore {
     this.redisClient = redisClient;
   }
 
-  public async flush(): Promise<void> {
-    await this.redisClient.flushall();
-  }
+  // public async flush(): Promise<void> {
+  //   await this.redisClient.flushall();
+  // }
 
-  public async createRooms(ipHash: string): Promise<string[]> {
-    try {
-      await this.redisClient.flushall();
+  // public async createRooms(ipHash: string): Promise<string[]> {
+  //   try {
+  //     await this.redisClient.flushall();
 
-      // TODO: Move this to server.
-      // - Check if "to" authorId has posted in the given thread.
+  //     const rooms = Array.from({ length: 10 }).map(() =>
+  //       crypto.randomBytes(32).toString('hex').slice(-6)
+  //     );
+  //     const ipHashes = Array.from({ length: 10 }).map(() =>
+  //       crypto.randomBytes(32).toString('hex')
+  //     );
+  //     const boards = ['b', 'gif', 'x'];
+  //     const multi = this.redisClient.multi();
 
-      const rooms = Array.from({ length: 10 }).map(() =>
-        crypto.randomBytes(32).toString('hex').slice(-6)
-      );
-      const ipHashes = Array.from({ length: 10 }).map(() =>
-        crypto.randomBytes(32).toString('hex')
-      );
-      const boards = ['b', 'gif', 'x'];
-      const multi = this.redisClient.multi();
+  //     for (const roomId of rooms) {
+  //       const partner = ipHashes[0];
+  //       // Set room data.
+  //       multi.hmset(`room:${roomId}:data`, {
+  //         id: roomId,
+  //         boardId: boards[Math.floor(Math.random() * boards.length)],
+  //         threadId: Math.round(Math.random() * 999999999),
+  //       });
 
-      for (const roomId of rooms) {
-        const partner = ipHashes[0];
-        // Set room data.
-        multi.hmset(`room:${roomId}:data`, {
-          id: roomId,
-          boardId: boards[Math.floor(Math.random() * boards.length)],
-          threadId: Math.round(Math.random() * 999999999),
-        });
+  //       // Set IP data.
+  //       multi.hmset(`room:${roomId}:ip:${ipHash}:data`, {
+  //         ipHash,
+  //         authorId: helpers.encrypt(ipHash),
+  //       });
+  //       multi.hmset(`room:${roomId}:ip:${partner}:data`, {
+  //         ipHash: partner,
+  //         authorId: helpers.encrypt(partner),
+  //       });
 
-        // Set IP data.
-        multi.hmset(`room:${roomId}:ip:${ipHash}:data`, {
-          ipHash,
-          authorId: helpers.encrypt(ipHash),
-        });
-        multi.hmset(`room:${roomId}:ip:${partner}:data`, {
-          ipHash: partner,
-          authorId: helpers.encrypt(partner),
-        });
+  //       // Set unread messages count.
+  //       multi.set(
+  //         `room:${roomId}:ip:${ipHash}:unread`,
+  //         Math.round(Math.random() * 10)
+  //       );
+  //       multi.set(`room:${roomId}:ip:${partner}:unread`, 0);
 
-        // Set unread messages count.
-        multi.set(
-          `room:${roomId}:ip:${ipHash}:unread`,
-          Math.round(Math.random() * 10)
-        );
-        multi.set(`room:${roomId}:ip:${partner}:unread`, 0);
+  //       // Add dummy messages.
+  //       const messages = generateMessageSet();
+  //       let now = Date.now();
+  //       for (const { content, fromSelf } of messages) {
+  //         now += Math.round(Math.random() * 100000);
+  //         multi.hmset(`room:${roomId}:message:${now}:data`, {
+  //           from: helpers.encrypt(fromSelf ? ipHash : partner),
+  //           content,
+  //           createdAt: now,
+  //         });
+  //       }
+  //     }
 
-        // Add dummy messages.
-        const messages = generateMessageSet();
-        let now = Date.now();
-        for (const { content, fromSelf } of messages) {
-          now += Math.round(Math.random() * 100000);
-          multi.hmset(`room:${roomId}:message:${now}:data`, {
-            from: helpers.encrypt(fromSelf ? ipHash : partner),
-            content,
-            createdAt: now,
-          });
-        }
-      }
+  //     multi.set(`ip:${ipHash}:online`, 1);
+  //     for (const _ipHash of ipHashes) {
+  //       multi.set(`ip:${_ipHash}:online`, Math.round(Math.random()));
+  //     }
 
-      multi.set(`ip:${ipHash}:online`, 1);
-      for (const _ipHash of ipHashes) {
-        multi.set(`ip:${_ipHash}:online`, Math.round(Math.random()));
-      }
-
-      // Execute.
-      await multi.exec();
-    } catch (error) {
-      logger.error(`Error creating rooms. ${error}`);
-    }
-    return [];
-  }
+  //     // Execute.
+  //     await multi.exec();
+  //   } catch (error) {
+  //     logger.error(`Error creating rooms. ${error}`);
+  //   }
+  //   return [];
+  // }
 
   /*
    * Sets the user as "online" and returns the unread message count.

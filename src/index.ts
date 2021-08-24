@@ -1,7 +1,7 @@
 import * as helpers from './helpers';
 import * as socketIo from 'socket.io';
 import * as socketIoRedis from 'socket.io-redis';
-import * as socketIoSticky from '@socket.io/sticky';
+// import * as socketIoSticky from '@socket.io/sticky';
 import Redis from 'ioredis';
 import RedisSessionStore from './sessionStore';
 import { createServer } from 'http';
@@ -9,18 +9,11 @@ import { logger } from './globals';
 
 const httpServer = createServer();
 const redisClient = new Redis({
-  host: 'redis',
+  host: 'redis', // Docker Compose host.
   port: 6379,
 });
 const io = new socketIo.Server(httpServer, {
-  cors: {
-    origin: [
-      'http://localhost:3000',
-      'http://mod.localhost:3000',
-      'http://local.starchan.org:3000',
-      'http://mod.local.starchan.org:3000',
-    ],
-  },
+  path: '/',
   adapter: socketIoRedis.createAdapter({
     pubClient: redisClient,
     subClient: redisClient.duplicate(),
@@ -31,7 +24,7 @@ const sessionStore = new RedisSessionStore(redisClient);
 
 // Extend the base socket.io typings.
 declare module 'socket.io' {
-  class Socket {
+  interface Socket {
     ipAddress: string;
     ipHash: string;
     myRooms: { roomId: string; myAuthorId: string }[];
@@ -41,7 +34,9 @@ declare module 'socket.io' {
 
 // Middleware to set the IP hash and mark the user as online.
 io.use(async (socket, next) => {
-  let ipAddress = socket.handshake.address;
+  let ipAddress =
+    (socket.handshake.headers['x-real-ip'] as string) ||
+    socket.handshake.address;
   if (ipAddress === '::1') {
     ipAddress = '127.0.0.1';
   } else if (ipAddress.includes(':')) {
@@ -61,11 +56,6 @@ io.on('connection', async (socket) => {
     `New connection from IP ${socket.ipAddress} (${socket.ipHash.slice(-6)})`
   );
 
-  // CREATE ROOM
-  // await sessionStore.flush();
-  // await sessionStore.createRooms(socket.ipHash);
-  //
-
   // Join "ipHash" room.
   socket.join(socket.ipHash);
 
@@ -73,6 +63,7 @@ io.on('connection', async (socket) => {
   for (const { roomId, myAuthorId } of socket.myRooms) {
     socket.join(roomId);
     socket.to(roomId).emit('user connected', { roomId, authorId: myAuthorId });
+    logger.debug(`IP ${socket.ipHash.slice(-6)} joined room ${roomId}`);
   }
 
   /*
@@ -81,6 +72,7 @@ io.on('connection', async (socket) => {
   socket.on('refresh', async () => {
     const rooms = await sessionStore.listRooms(socket.ipHash);
     socket.myRooms = rooms;
+    logger.debug(`IP ${socket.ipHash.slice(-6)} refreshed room list`);
   });
 
   /*
@@ -89,6 +81,9 @@ io.on('connection', async (socket) => {
   socket.on('total unread', async () => {
     const count = await sessionStore.getTotalUnreadCount(socket.ipHash);
     socket.emit('total unread', { count });
+    logger.debug(
+      `IP ${socket.ipHash.slice(-6)} fetched total unread message count`
+    );
   });
 
   /*
@@ -97,6 +92,9 @@ io.on('connection', async (socket) => {
   socket.on('rooms', async () => {
     const rooms = await sessionStore.getRooms(socket.ipHash, socket.myRooms);
     socket.emit('rooms', rooms);
+    logger.debug(
+      `IP ${socket.ipHash.slice(-6)} fetched room data (${rooms.length})`
+    );
   });
 
   /*
@@ -113,6 +111,9 @@ io.on('connection', async (socket) => {
     const count = await sessionStore.getTotalUnreadCount(socket.ipHash);
     socket.emit('reset unread', { roomId });
     socket.emit('total unread', { count });
+    logger.debug(
+      `IP ${socket.ipHash.slice(-6)} fetched messages for room ${roomId}`
+    );
   });
 
   /*
@@ -128,6 +129,9 @@ io.on('connection', async (socket) => {
     socket.to(roomId).emit('incr unread', { roomId, count: 1 });
     socket.to(roomId).emit('message', message);
     socket.emit('message', { ...message, from: null });
+    logger.debug(
+      `IP ${socket.ipHash.slice(-6)} sent a message to room ${roomId}`
+    );
   });
 
   /*
@@ -149,6 +153,7 @@ io.on('connection', async (socket) => {
 
 // socketIoSticky.setupWorker(io);
 
-httpServer.listen(3002, () =>
-  console.log(`Socket server listening at http://localhost:${3002}`)
+const PORT = 3002;
+httpServer.listen(PORT, () =>
+  logger.info(`Listening at http://localhost:${PORT}`)
 );

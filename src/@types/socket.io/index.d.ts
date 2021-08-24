@@ -1,6 +1,9 @@
+// // Extend the base socket.io typings.
 // declare module 'socket.io' {
 //   class Socket {
-//     sessionId: string;
-//     authorId: string;
+//     ipAddress: string;
+//     ipHash: string;
+//     myRooms: { roomId: string; myAuthorId: string }[];
+//     boardId: string;
 //   }
 // }

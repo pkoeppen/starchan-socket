@@ -1,9 +1,9 @@
+import * as globals from './globals';
 import crypto from 'crypto';
 
 const SIMPLE_ENCRYPTION_KEY = crypto
   .createHash('sha256')
-  // .update(config.SIMPLE_ENCRYPTION_KEY)
-  .update('starchan') // todo
+  .update(globals.SIMPLE_ENCRYPTION_KEY as string)
   .digest('hex')
   .slice(0, 16);
 
