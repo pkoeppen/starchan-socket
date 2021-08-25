@@ -144,7 +144,9 @@ io.on('connection', async (socket) => {
     if (isDisconnected) {
       // Emit disconnect event to all rooms this user is in.
       for (const { roomId, myAuthorId } of socket.myRooms) {
-        socket.to(roomId).emit('user disconnected', myAuthorId);
+        socket
+          .to(roomId)
+          .emit('user disconnected', { roomId, authorId: myAuthorId });
       }
       await sessionStore.setOffline(socket.ipHash);
     }
