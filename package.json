@@ -30,6 +30,7 @@
   "devDependencies": {
     "@commitlint/cli": "^12.1.4",
     "@commitlint/config-conventional": "^12.1.4",
+    "@types/faker": "5.5.8",
     "@types/ioredis": "4.26.6",
     "@types/lodash": "4.14.171",
     "@types/node": "16.3.1",
@@ -42,6 +43,7 @@
     "eslint-config-prettier": "8.3.0",
     "eslint-plugin-jest": "24.3.6",
     "eslint-plugin-prettier": "3.4.0",
+    "faker": "5.5.3",
     "husky": "7.0.1",
     "lint-staged": "11.0.0",
     "prettier": "2.3.2",

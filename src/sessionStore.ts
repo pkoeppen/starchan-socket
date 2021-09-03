@@ -15,6 +15,7 @@ interface RoomData {
 }
 
 interface Message {
+  roomId: string;
   from: string;
   content: string;
   createdAt: number;
@@ -308,53 +309,60 @@ export default class RedisSessionStore {
     roomId: string;
     ipHash: string;
     content: string;
-  }): Promise<Message> {
-    if (!params.content) {
-      throw new Error('Missing message content');
-    }
-    if (typeof params.content !== 'string') {
-      throw new Error('Invalid message content');
-    }
-    if (params.content.length > 250) {
-      throw new Error('Message too long');
-    }
-
-    const authorId = await this.redisClient.hget(
-      `room:${params.roomId}:ip:${params.ipHash}:data`,
-      'authorId'
-    );
-
-    if (!authorId) {
-      throw new Error('User not in room');
-    }
-
-    const participantKeys = await this.scanKeys(`room:${params.roomId}:ip:*:*`);
-
-    // Post message and expire all room keys.
-    const multi = this.redisClient.multi();
-    const now = Date.now();
-    const message = {
-      from: authorId,
-      content: params.content,
-      createdAt: now,
-    };
-    multi.hmset(`room:${params.roomId}:message:${now}:data`, message);
-    multi.expire(`room:${params.roomId}:message:${now}:data`, MESSAGE_TTL);
-    multi.expire(`room:${params.roomId}`, MESSAGE_TTL);
-    for (const key of participantKeys) {
-      if (key.endsWith('unread') && !key.includes(`ip:${params.ipHash}`)) {
-        multi.incr(key);
+  }): Promise<Message | undefined> {
+    try {
+      if (!params.content) {
+        throw new Error('Missing message content');
       }
-      multi.expire(key, MESSAGE_TTL);
+      if (typeof params.content !== 'string') {
+        throw new Error('Invalid message content');
+      }
+      if (params.content.length > 250) {
+        throw new Error('Message too long');
+      }
+
+      const authorId = await this.redisClient.hget(
+        `room:${params.roomId}:ip:${params.ipHash}:data`,
+        'authorId'
+      );
+
+      if (!authorId) {
+        throw new Error('User not in room');
+      }
+
+      const participantKeys = await this.scanKeys(
+        `room:${params.roomId}:ip:*:*`
+      );
+
+      // Post message and expire all room keys.
+      const multi = this.redisClient.multi();
+      const now = Date.now();
+      const message = {
+        roomId: params.roomId,
+        from: authorId,
+        content: params.content,
+        createdAt: now,
+      };
+      multi.hmset(`room:${params.roomId}:message:${now}:data`, message);
+      multi.expire(`room:${params.roomId}:message:${now}:data`, MESSAGE_TTL);
+      multi.expire(`room:${params.roomId}:data`, MESSAGE_TTL);
+      for (const key of participantKeys) {
+        if (key.endsWith('unread') && !key.includes(`ip:${params.ipHash}`)) {
+          multi.incr(key);
+        }
+        multi.expire(key, MESSAGE_TTL);
+      }
+      await multi.exec();
+      return message;
+    } catch (error) {
+      logger.error(`Error saving message. ${error}`);
     }
-    await multi.exec();
-    return message;
   }
 
   /*
    * Recursively scans all keys matching the given pattern.
    */
-  private async scanKeys(pattern: string) {
+  public async scanKeys(pattern: string) {
     const keys: Set<string> = new Set();
     let cursor = 0;
     do {

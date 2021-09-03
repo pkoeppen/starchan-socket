@@ -5,7 +5,9 @@ import * as socketIoRedis from 'socket.io-redis';
 import Redis from 'ioredis';
 import RedisSessionStore from './sessionStore';
 import { createServer } from 'http';
+import faker from 'faker';
 import { logger } from './globals';
+import { sample } from 'lodash';
 
 const httpServer = createServer();
 const redisClient = new Redis({
@@ -51,6 +53,17 @@ io.use(async (socket, next) => {
   next();
 });
 
+/*
+ * Dev-only chat reply simulator.
+ */
+if (process.env.NODE_ENV !== 'production') {
+  io.on('connection', async (socket) => {
+    socket.on('message', async ({ roomId }) => {
+      await simulateReply(socket, roomId);
+    });
+  });
+}
+
 io.on('connection', async (socket) => {
   logger.debug(
     `New connection from IP ${socket.ipAddress} (${socket.ipHash.slice(-6)})`
@@ -83,6 +96,18 @@ io.on('connection', async (socket) => {
     socket.emit('total unread', { count });
     logger.debug(
       `IP ${socket.ipHash.slice(-6)} fetched total unread message count`
+    );
+  });
+
+  /*
+   * Resets the unread count for the given room.
+   */
+  socket.on('reset unread', async ({ roomId }) => {
+    await sessionStore.resetUnreadCount(socket.ipHash, roomId);
+    logger.debug(
+      `IP ${socket.ipHash.slice(
+        -6
+      )} reset unread message count for room ${roomId}`
     );
   });
 
@@ -125,13 +150,15 @@ io.on('connection', async (socket) => {
       content,
       ipHash: socket.ipHash,
     });
-    socket.to(roomId).emit('incr total unread', { roomId, count: 1 });
-    socket.to(roomId).emit('incr unread', { roomId, count: 1 });
-    socket.to(roomId).emit('message', message);
-    socket.emit('message', { ...message, from: null });
-    logger.debug(
-      `IP ${socket.ipHash.slice(-6)} sent a message to room ${roomId}`
-    );
+    if (message) {
+      socket.to(roomId).emit('incr total unread', { roomId, count: 1 });
+      socket.to(roomId).emit('incr unread', { roomId, count: 1 });
+      socket.to(roomId).emit('message', message);
+      socket.emit('message', { ...message, from: null });
+      logger.debug(
+        `IP ${socket.ipHash.slice(-6)} sent a message to room ${roomId}`
+      );
+    }
   });
 
   /*
@@ -159,3 +186,56 @@ const PORT = 3002;
 httpServer.listen(PORT, () =>
   logger.info(`Listening at http://localhost:${PORT}`)
 );
+
+/*
+ * Dev-only method to simulate a chat reply.
+ */
+async function simulateReply(
+  socket: socketIo.Socket,
+  roomId: string
+): Promise<void> {
+  try {
+    const keys = (
+      await sessionStore.scanKeys(`room:${roomId}:ip:*:data`)
+    ).filter((key) => !key.includes(socket.ipHash));
+    const key = sample(keys) as string;
+
+    const ipHash = key?.split(':')[3];
+    const authorId = await sessionStore.redisClient.hget(key, 'authorId');
+
+    if (!ipHash || !authorId) {
+      // Something went wrong. Who cares.
+      return;
+    }
+
+    socket.emit('user connected', { roomId, authorId });
+    const messages = Array.from({ length: random(1, 4) });
+
+    let timeout = 0;
+    for (let i = 1; i <= messages.length; i++) {
+      timeout = (timeout || 0) + Math.round(Math.random() * 5000);
+      setTimeout(async () => {
+        const message = await sessionStore.saveMessage({
+          roomId,
+          content: faker.lorem.sentence(),
+          ipHash,
+        });
+        socket.emit('incr total unread', { roomId, count: 1 });
+        socket.emit('incr unread', { roomId, count: 1 });
+        socket.emit('message', message);
+      }, timeout);
+    }
+    setTimeout(() => {
+      socket.emit('user disconnected', { roomId, authorId });
+    }, timeout + 5000);
+  } catch (error) {
+    logger.error(`Error simulating chat reply. ${error}`);
+  }
+}
+
+/*
+ * Returns a random whole number (min <= n < max) in the given range.
+ */
+function random(min: number, max: number): number {
+  return Math.floor(Math.random() * (max - min) + min);
+}
